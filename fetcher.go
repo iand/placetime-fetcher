@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/md5"
+	"flag"
 	"fmt"
 	"github.com/iand/feedparser"
 	"github.com/iand/imgpick"
@@ -18,14 +19,54 @@ import (
 )
 
 var (
-	imgDir = "/var/opt/timescroll/img"
+	imgDir       = "/var/opt/timescroll/img"
+	feedInterval = 30
+	runOnce      = false
 )
 
 func main() {
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	flag.StringVar(&imgDir, "images", "/var/opt/timescroll/img", "filesystem directory to store fetched images")
+	flag.IntVar(&feedInterval, "feedinterval", 30, "interval for checking feeds (minutes)")
+	flag.BoolVar(&runOnce, "runonce", false, "run the fetcher once and then exit")
+	flag.Parse()
+
+	checkEnvironment()
+	log.Printf("Image directory: %s", imgDir)
+
+	pollFeeds()
+	pollImages()
+
+	if runOnce {
+		return
+	}
+
 	ticker := time.Tick(30 * time.Minute)
 	for _ = range ticker {
 		pollFeeds()
 		pollImages()
+	}
+
+}
+
+func checkEnvironment() {
+	f, err := os.Open(imgDir)
+	if err != nil {
+		log.Printf("Could not open image path %s: %s", imgDir, err.Error())
+		os.Exit(1)
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		log.Printf("Could not stat image path %s: %s", imgDir, err.Error())
+		os.Exit(1)
+	}
+
+	if !fi.IsDir() {
+		log.Printf("Image path is not a directory %s: %s", imgDir, err.Error())
+		os.Exit(1)
 	}
 
 }
