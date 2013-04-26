@@ -22,6 +22,7 @@ var (
 	imgDir       = "/var/opt/timescroll/img"
 	feedInterval = 30
 	runOnce      = false
+	feedurl      = ""
 )
 
 func main() {
@@ -31,7 +32,13 @@ func main() {
 	flag.StringVar(&imgDir, "images", "/var/opt/timescroll/img", "filesystem directory to store fetched images")
 	flag.IntVar(&feedInterval, "feedinterval", 30, "interval for checking feeds (minutes)")
 	flag.BoolVar(&runOnce, "runonce", false, "run the fetcher once and then exit")
+	flag.StringVar(&feedurl, "debugfeed", "", "run the fetcher on the given feed url and debug results")
 	flag.Parse()
+
+	if feedurl != "" {
+		debugFeed(feedurl)
+		return
+	}
 
 	checkEnvironment()
 	log.Printf("Image directory: %s", imgDir)
@@ -176,7 +183,7 @@ func itemsFromFeed(pid string, feed *feedparser.Feed) []*datastore.Item {
 			hasher := md5.New()
 			io.WriteString(hasher, item.Id)
 			id := fmt.Sprintf("%x", hasher.Sum(nil))
-			items = append(items, &datastore.Item{Id: id, Pid: pid, Event: item.When.Unix(), Text: item.Title, Link: item.Link})
+			items = append(items, &datastore.Item{Id: id, Pid: pid, Event: item.When.Unix(), Text: item.Title, Link: item.Link, Image: item.Image})
 		}
 	}
 	return items
@@ -245,4 +252,29 @@ func updateProfileItemData(data *ProfileItemData) error {
 	}
 
 	return nil
+}
+
+func debugFeed(url string) {
+	log.Printf("Debugging feed %s", url)
+	resp, err := http.Get(url)
+	log.Printf("Response: %s", resp.Status)
+
+	if err != nil {
+		log.Printf("Fetch of feed got http error  %s", err.Error())
+		return
+	}
+
+	defer resp.Body.Close()
+
+	feed, err := feedparser.NewFeed(resp.Body)
+
+	for _, item := range feed.Items {
+		fmt.Printf("--Item (%s)\n", item.Id)
+		fmt.Printf("  Title: %s\n", item.Title)
+		fmt.Printf("  Link:  %s\n", item.Link)
+		fmt.Printf("  Image: %s\n", item.Image)
+
+		//		s.AddItem(item.Pid, time.Unix(item.Event, 0), item.Text, item.Link, item.Image, item.Id)
+	}
+
 }
