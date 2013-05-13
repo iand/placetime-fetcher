@@ -29,7 +29,7 @@ var (
 )
 
 func main() {
-
+	log.Printf("Starting fetcher")
 	flag.StringVar(&imgDir, "images", "/var/opt/timescroll/img", "filesystem directory to store fetched images")
 	flag.IntVar(&feedInterval, "feedinterval", 30, "interval for checking feeds (minutes)")
 	flag.IntVar(&imageInterval, "imageInterval", 30, "interval for checking feature images (seconds)")
@@ -44,6 +44,7 @@ func main() {
 	}
 
 	checkEnvironment()
+
 	log.Printf("Images will be written to: %s", imgDir)
 
 	const bufferLength = 0
@@ -68,6 +69,7 @@ func main() {
 	}
 
 	close(quit)
+	log.Printf("Stopping fetcher")
 }
 
 func checkEnvironment() {
@@ -159,7 +161,6 @@ func pumpRssJobs(jobs chan<- Job) {
 
 	profiles, _ := s.FeedDrivenProfiles()
 	if len(profiles) == 0 {
-		log.Printf("No feeds require fetching")
 		return
 	}
 	for _, p := range profiles {
@@ -176,7 +177,6 @@ func pumpImageJobs(jobs chan<- Job) {
 	for {
 		items, _ := s.GrabItemsNeedingImages(10)
 		if len(items) == 0 {
-			log.Printf("No items require images to be fetched")
 			return
 		}
 		for _, item := range items {
