@@ -31,8 +31,8 @@ var (
 func main() {
 
 	flag.StringVar(&imgDir, "images", "/var/opt/timescroll/img", "filesystem directory to store fetched images")
-	flag.IntVar(&feedInterval, "feedinterval", 10, "interval for checking feeds (minutes)")
-	flag.IntVar(&imageInterval, "imageInterval", 15, "interval for checking feature images (seconds)")
+	flag.IntVar(&feedInterval, "feedinterval", 30, "interval for checking feeds (minutes)")
+	flag.IntVar(&imageInterval, "imageInterval", 30, "interval for checking feature images (seconds)")
 	flag.IntVar(&workers, "workers", 5, "number of concurrent workers")
 	flag.BoolVar(&runOnce, "runonce", false, "run the fetcher once and then exit")
 	flag.StringVar(&feedurl, "debugfeed", "", "run the fetcher on the given feed url and debug results")
@@ -233,7 +233,7 @@ func (job RssJob) Do() {
 		hasher := md5.New()
 		io.WriteString(hasher, item.Id)
 		id := fmt.Sprintf("%x", hasher.Sum(nil))
-		_, err := s.AddItem(job.Pid, item.When, item.Title, item.Link, item.Image, id)
+		_, err := s.AddItem(job.Pid, time.Unix(0, 0), item.Title, item.Link, item.Image, id)
 		if err != nil {
 			log.Printf("RSS job failed to add item from feed: %s", err.Error())
 		}
