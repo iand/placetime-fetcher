@@ -39,7 +39,7 @@ var (
 		Fetcher: FetcherConfig{
 			Workers: 5,
 			Feed: FetcherFeedConfig{
-				Interval: 30,
+				Interval: 30 * 60,
 			},
 			Image: FetcherImageConfig{
 				Interval: 30,
