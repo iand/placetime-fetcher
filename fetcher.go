@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/md5"
-	"flag"
 	"fmt"
 	"github.com/iand/feedparser"
 	"github.com/iand/imgpick"
@@ -20,23 +19,13 @@ import (
 )
 
 var (
-	imgDir        = "/var/opt/timescroll/img"
-	feedInterval  = 10
-	imageInterval = 5
-	runOnce       = false
-	feedurl       = ""
-	workers       = 5
+	runOnce = false
+	feedurl = ""
+	config  Config
 )
 
 func main() {
-	log.Printf("Starting fetcher")
-	flag.StringVar(&imgDir, "images", "/var/opt/timescroll/img", "filesystem directory to store fetched images")
-	flag.IntVar(&feedInterval, "feedinterval", 30, "interval for checking feeds (minutes)")
-	flag.IntVar(&imageInterval, "imageInterval", 30, "interval for checking feature images (seconds)")
-	flag.IntVar(&workers, "workers", 5, "number of concurrent workers")
-	flag.BoolVar(&runOnce, "runonce", false, "run the fetcher once and then exit")
-	flag.StringVar(&feedurl, "debugfeed", "", "run the fetcher on the given feed url and debug results")
-	flag.Parse()
+	readConfig()
 
 	if feedurl != "" {
 		debugFeed(feedurl)
@@ -44,8 +33,9 @@ func main() {
 	}
 
 	checkEnvironment()
+	datastore.InitRedisStore(config.Datastore)
 
-	log.Printf("Images will be written to: %s", imgDir)
+	log.Printf("Images will be written to: %s", config.Image.Path)
 
 	const bufferLength = 0
 
@@ -61,8 +51,8 @@ func main() {
 		log.Printf("Using %d processor cores", runtime.NumCPU())
 		runtime.GOMAXPROCS(runtime.NumCPU())
 
-		log.Printf("Starting %d workers", workers)
-		for w := 0; w < workers; w++ {
+		log.Printf("Starting %d workers", config.Fetcher.Workers)
+		for w := 0; w < config.Fetcher.Workers; w++ {
 			go worker(w, jobs, quit)
 		}
 		pumpContinuous(jobs, quit)
@@ -70,26 +60,6 @@ func main() {
 
 	close(quit)
 	log.Printf("Stopping fetcher")
-}
-
-func checkEnvironment() {
-	f, err := os.Open(imgDir)
-	if err != nil {
-		log.Printf("Could not open image path %s: %s", imgDir, err.Error())
-		os.Exit(1)
-	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		log.Printf("Could not stat image path %s: %s", imgDir, err.Error())
-		os.Exit(1)
-	}
-
-	if !fi.IsDir() {
-		log.Printf("Image path is not a directory %s: %s", imgDir, err.Error())
-		os.Exit(1)
-	}
-
 }
 
 func debugFeed(url string) {
@@ -127,11 +97,14 @@ type FetchRecord struct {
 
 func pumpContinuous(jobs chan<- Job, quit <-chan bool) {
 
-	feedTicker := time.NewTicker(time.Duration(feedInterval) * time.Minute)
-	imageTicker := time.NewTicker(time.Duration(imageInterval) * time.Second)
+	feedInterval := time.Duration(config.Fetcher.Feed.Interval) * time.Second
+	imageInterval := time.Duration(config.Fetcher.Image.Interval) * time.Second
 
-	log.Printf("Waiting %d minutes before fetching feeds", feedInterval)
-	log.Printf("Waiting %d seconds before fetching images", imageInterval)
+	log.Printf("Waiting %s seconds before fetching feeds", feedInterval)
+	log.Printf("Waiting %s seconds before fetching images", imageInterval)
+
+	feedTicker := time.NewTicker(feedInterval)
+	imageTicker := time.NewTicker(imageInterval)
 
 	for {
 
@@ -260,7 +233,7 @@ func (job ImageJob) Do() {
 
 	filename := fmt.Sprintf("%s.png", job.ItemId)
 
-	foutName := path.Join(imgDir, filename)
+	foutName := path.Join(config.Image.Path, filename)
 
 	fout, err := os.OpenFile(foutName, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
