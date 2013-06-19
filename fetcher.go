@@ -138,7 +138,7 @@ func pumpRssJobs(jobs chan<- Job) {
 	}
 	for _, p := range profiles {
 		log.Printf("Pumping feed for profile %s", p.Pid)
-		jobs <- RssJob{Url: p.FeedUrl, Pid: p.Pid}
+		jobs <- RssJob{Url: p.FeedUrl, Pid: p.Pid, ItemType: p.ItemType}
 	}
 
 }
@@ -177,8 +177,9 @@ func worker(id int, jobs <-chan Job, quit <-chan bool) {
 }
 
 type RssJob struct {
-	Url string
-	Pid datastore.PidType
+	Url      string
+	Pid      datastore.PidType
+	ItemType string
 }
 
 func (job RssJob) Do() {
@@ -206,7 +207,7 @@ func (job RssJob) Do() {
 		hasher := md5.New()
 		io.WriteString(hasher, item.Id)
 		id := fmt.Sprintf("%x", hasher.Sum(nil))
-		_, err := s.AddItem(job.Pid, time.Unix(0, 0), item.Title, item.Link, item.Image, datastore.ItemIdType(id))
+		_, err := s.AddItem(job.Pid, time.Unix(0, 0), item.Title, item.Link, item.Image, datastore.ItemIdType(id), job.ItemType)
 		if err != nil {
 			log.Printf("RSS job failed to add item from feed: %s", err.Error())
 		}
