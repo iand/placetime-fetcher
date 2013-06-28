@@ -223,7 +223,7 @@ type ImageJob struct {
 func (job ImageJob) Do() {
 	log.Printf("Looking for a feature image for %s", job.Url)
 
-	img, _, _, err := imgpick.PickImage(job.Url)
+	img, err := imgpick.PickImage(job.Url)
 
 	if img == nil || err != nil {
 		log.Printf("Image job failed to pick an image: %s", err.Error())
