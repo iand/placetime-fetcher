@@ -5,15 +5,11 @@ import (
 	"fmt"
 	"github.com/iand/feedparser"
 	"github.com/iand/imgpick"
-	"github.com/iand/salience"
 	// "github.com/mjarco/bloom"
 	"github.com/placetime/datastore"
-	"image/png"
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"path"
 	"runtime"
 	"time"
 )
@@ -33,7 +29,7 @@ func main() {
 	}
 
 	checkEnvironment()
-	datastore.InitRedisStore(config.Datastore)
+	datastore.InitRedisStore(config.Datastore, config.Image.Path)
 
 	log.Printf("Images will be written to: %s", config.Image.Path)
 
@@ -223,31 +219,12 @@ type ImageJob struct {
 func (job ImageJob) Do() {
 	log.Printf("Looking for a feature image for %s", job.Url)
 
-	img, err := imgpick.PickImage(job.Url)
+	data, err := imgpick.DetectMedia(job.Url, true)
 
-	if img == nil || err != nil {
+	if err != nil {
 		log.Printf("Image job failed to pick an image: %s", err.Error())
 		return
 	}
-
-	imgOut := salience.Crop(img, 460, 160)
-
-	filename := fmt.Sprintf("%s.png", job.ItemId)
-
-	foutName := path.Join(config.Image.Path, filename)
-
-	fout, err := os.OpenFile(foutName, os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		log.Printf("Image job failed to open image file for writing: %s", err.Error())
-		return
-	}
-
-	if err = png.Encode(fout, imgOut); err != nil {
-		log.Printf("Image job failed to encode image as PNG: %s", err.Error())
-		return
-	}
-
-	log.Printf("Image job wrote image to: %s", foutName)
 
 	s := datastore.NewRedisStore()
 	defer s.Close()
@@ -258,8 +235,8 @@ func (job ImageJob) Do() {
 		return
 	}
 
-	item.Image = filename
-	item.Media = "text"
+	item.Image = data.BestImage
+	item.Media = data.MediaType
 
 	err = s.UpdateItem(item)
 	if err != nil {
